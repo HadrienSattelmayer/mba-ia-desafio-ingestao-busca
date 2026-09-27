@@ -1,155 +1,150 @@
 # Ingestão e Busca Semântica com LangChain e Postgres
 
-## Objetivo
+Sistema RAG que faz a ingestão de um PDF em um banco PostgreSQL com pgVector e permite fazer perguntas via linha de comando, com respostas baseadas **apenas** no conteúdo do documento.
 
-Você deve entregar um software capaz de:
-
-- Ingestão: Ler um arquivo PDF e salvar suas informações em um banco de dados PostgreSQL com extensão pgVector.
-- Busca: Permitir que o usuário faça perguntas via linha de comando (CLI) e receba respostas baseadas apenas no conteúdo do PDF.
-
-## Exemplo no CLI
-
-Faça sua pergunta:
+## Arquitetura
 
 ```
-PERGUNTA: Qual o faturamento da Empresa SuperTechIABrazil?
-RESPOSTA: O faturamento foi de 10 milhões de reais.
+Ingestão:  document.pdf → PyPDFLoader → RecursiveCharacterTextSplitter (1000 / 150)
+                        → Gemini Embeddings → PGVector (PostgreSQL)
 
----
-
-Perguntas fora do contexto:
-
-PERGUNTA: Quantos clientes temos em 2024?
-RESPOSTA: Não tenho informações necessárias para responder sua pergunta.
+Busca:     pergunta → embedding → similarity_search_with_score (k=10)
+                    → prompt com contexto → Gemini (LLM) → resposta
 ```
 
-## Tecnologias obrigatórias
+## Tecnologias
 
-- Linguagem: Python
-- Framework: LangChain
-- Banco de dados: PostgreSQL + pgVector
-- Execução do banco de dados: Docker & Docker Compose (docker-compose fornecido no repositório de exemplo)
+- Python 3.11+
+- LangChain
+- PostgreSQL 17 + pgVector (via Docker Compose)
+- Google Gemini (embeddings e LLM)
 
-## Pacotes recomendados
-
-- Split: `from langchain_text_splitters import RecursiveCharacterTextSplitter`
-- Embeddings (OpenAI): `from langchain_openai import OpenAIEmbeddings`
-- Embeddings (Gemini): `from langchain_google_genai import GoogleGenerativeAIEmbeddings`
-- PDF: `from langchain_community.document_loaders import PyPDFLoader`
-- Ingestão: `from langchain_postgres import PGVector`
-- Busca: `similarity_search_with_score(query, k=10)`
-
-## OpenAI
-
-- Crie uma API Key da OpenAI.
-- Você vai precisar de um modelo de embeddings e de um modelo de LLM para responder. Consulte a documentação oficial da OpenAI para ver os modelos disponíveis.
-
-## Gemini
-
-- Crie uma API Key da Google.
-- Você vai precisar de um modelo de embeddings e de um modelo de LLM para responder. Consulte a documentação oficial do Google para ver os modelos disponíveis.
-
-Os limites de requisições gratuitas dos modelos podem mudar com frequência. Para informações atualizadas, consulte a documentação oficial do Google.
-
-## Escolha dos modelos
-
-Este desafio não fixa modelos. Nomes e versões mudam com frequência e alguns são descontinuados, então faz parte do desafio consultar a documentação oficial do provedor que você escolher, ver quais modelos estão disponíveis no momento e selecionar os que atendem ao objetivo. Para o volume deste desafio, os modelos mais leves e baratos de cada provedor são suficientes.
-
-Atenção: modelos de embedding diferentes geram vetores com dimensões diferentes. A tabela de vetores é criada na primeira ingestão, já com a dimensão do modelo que você escolheu. Se você trocar de modelo de embeddings depois disso, a ingestão passa a falhar por incompatibilidade de dimensão. Nesse caso é responsabilidade sua apagar a collection existente (ou o volume do banco) e refazer a ingestão do zero com o novo modelo.
-
-## Requisitos
-
-### 1. Ingestão do PDF
-
-- O PDF deve ser dividido em chunks de 1000 caracteres com overlap de 150.
-- Cada chunk deve ser convertido em embedding.
-- Os vetores devem ser armazenados no banco de dados PostgreSQL com pgVector.
-
-### 2. Consulta via CLI
-
-Criar um script Python para simular um chat no terminal.
-
-Passos ao receber uma pergunta:
-
-- Vetorizar a pergunta.
-- Buscar os 10 resultados mais relevantes (k=10) no banco vetorial.
-- Montar o prompt e chamar a LLM.
-- Retornar a resposta ao usuário.
-
-Prompt a ser utilizado:
+## Estrutura
 
 ```
-CONTEXTO:
-{resultados concatenados do banco de dados}
-
-REGRAS:
-- Responda somente com base no CONTEXTO.
-- Se a informação não estiver explicitamente no CONTEXTO, responda:
-  "Não tenho informações necessárias para responder sua pergunta."
-- Nunca invente ou use conhecimento externo.
-- Nunca produza opiniões ou interpretações além do que está escrito.
-
-EXEMPLOS DE PERGUNTAS FORA DO CONTEXTO:
-Pergunta: "Qual é a capital da França?"
-Resposta: "Não tenho informações necessárias para responder sua pergunta."
-
-Pergunta: "Quantos clientes temos em 2024?"
-Resposta: "Não tenho informações necessárias para responder sua pergunta."
-
-Pergunta: "Você acha isso bom ou ruim?"
-Resposta: "Não tenho informações necessárias para responder sua pergunta."
-
-PERGUNTA DO USUÁRIO:
-{pergunta do usuário}
-
-RESPONDA A "PERGUNTA DO USUÁRIO"
-```
-
-## Estrutura obrigatória do projeto
-
-Faça um fork do repositório para utilizar a estrutura abaixo: https://github.com/devfullcycle/mba-ia-desafio-ingestao-busca
-
-```
-├── docker-compose.yml
+├── docker-compose.yml    # PostgreSQL + pgVector
 ├── requirements.txt      # Dependências
 ├── .env.example          # Template das variáveis de ambiente
 ├── src/
-│   ├── ingest.py         # Script de ingestão do PDF
-│   ├── search.py         # Script de busca
-│   ├── chat.py           # CLI para interação com usuário
+│   ├── ingest.py         # Ingestão do PDF no banco vetorial
+│   ├── search.py         # Busca vetorial + prompt + LLM
+│   ├── chat.py           # CLI de perguntas e respostas
 ├── document.pdf          # PDF para ingestão
-└── README.md             # Instruções de execução
+└── README.md
 ```
 
-## VirtualEnv para Python
+## Pré-requisitos
 
-Crie e ative um ambiente virtual antes de instalar dependências:
+- Python 3.11 ou superior
+- Docker e Docker Compose
+- Uma API Key do Google Gemini ([Google AI Studio](https://aistudio.google.com/app/apikey))
 
+## Como executar
+
+### 1. Clonar o repositório
+
+```bash
+git clone <url-deste-repositorio>
+cd mba-ia-desafio-ingestao-busca
 ```
+
+### 2. Criar e ativar o ambiente virtual
+
+Linux / macOS:
+
+```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-## Ordem de execução
+Windows (PowerShell):
 
-1. Subir o banco de dados:
-
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
 ```
+
+### 3. Instalar as dependências
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configurar as variáveis de ambiente
+
+Copie o template e preencha a `GOOGLE_API_KEY`:
+
+```bash
+cp .env.example .env
+```
+
+| Variável | Descrição | Exemplo |
+|---|---|---|
+| `GOOGLE_API_KEY` | API Key do Google Gemini | `AIza...` |
+| `GOOGLE_EMBEDDING_MODEL` | Modelo de embeddings | `models/gemini-embedding-001` |
+| `GOOGLE_LLM_MODEL` | Modelo de LLM para as respostas | `gemini-2.5-flash-lite` |
+| `DATABASE_URL` | Conexão com o Postgres (driver psycopg 3) | `postgresql+psycopg://postgres:postgres@127.0.0.1:5432/rag` |
+| `PG_VECTOR_COLLECTION_NAME` | Nome da collection no pgVector | `documentos` |
+| `PDF_PATH` | Caminho do PDF a ser ingerido | `document.pdf` |
+
+> Os nomes de modelos mudam com frequência. Confira os modelos disponíveis na [documentação oficial do Gemini](https://ai.google.dev/gemini-api/docs/models).
+
+### 5. Subir o banco de dados
+
+```bash
 docker compose up -d
 ```
 
-2. Executar ingestão do PDF:
+O serviço `bootstrap_vector_ext` cria automaticamente a extensão `vector` no banco.
 
-```
+### 6. Executar a ingestão do PDF
+
+```bash
 python src/ingest.py
 ```
 
-3. Rodar o chat:
+Saída esperada:
 
 ```
+Ingestão concluída: 34 páginas, 67 chunks armazenados.
+```
+
+A ingestão usa IDs determinísticos por chunk, então pode ser executada novamente sem duplicar os dados.
+
+### 7. Rodar o chat
+
+```bash
 python src/chat.py
 ```
 
-## Entregável
+Digite `sair` (ou `Ctrl+C`) para encerrar.
 
-Repositório público no GitHub contendo todo o código-fonte e README com instruções claras de execução do projeto.
+## Exemplo de uso
+
+```
+Faça sua pergunta (digite 'sair' para encerrar):
+
+PERGUNTA: Qual o faturamento da empresa Alfa Energia S.A.?
+RESPOSTA: O faturamento da Alfa Energia S.A. foi de R$ 722.875.391,46.
+
+---
+
+PERGUNTA: Qual é a capital da França?
+RESPOSTA: Não tenho informações necessárias para responder sua pergunta.
+
+---
+```
+
+## Troubleshooting
+
+- **Troca de modelo de embeddings:** modelos diferentes geram vetores de dimensões diferentes. Ao trocar de modelo, apague o volume do banco e refaça a ingestão:
+
+  ```bash
+  docker compose down -v
+  docker compose up -d
+  python src/ingest.py
+  ```
+
+- **`connection timeout` ao conectar no banco:** verifique se o container está saudável (`docker compose ps`) e se a porta 5432 não está ocupada por outra instalação local do PostgreSQL. Se estiver, altere o mapeamento de porta no `docker-compose.yml` (ex.: `"5433:5432"`) e ajuste a `DATABASE_URL`.
+
+- **`DATABASE_URL` sem `+psycopg`:** o `langchain-postgres` usa o driver psycopg 3; a URL precisa começar com `postgresql+psycopg://`.
