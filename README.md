@@ -82,10 +82,12 @@ cp .env.example .env
 |---|---|---|
 | `GOOGLE_API_KEY` | API Key do Google Gemini | `AIza...` |
 | `GOOGLE_EMBEDDING_MODEL` | Modelo de embeddings | `models/gemini-embedding-001` |
-| `GOOGLE_LLM_MODEL` | Modelo de LLM para as respostas | `gemini-2.5-flash-lite` |
+| `GOOGLE_LLM_MODEL` | Modelo de LLM para as respostas | `gemini-3.5-flash-lite` |
 | `DATABASE_URL` | Conexão com o Postgres (driver psycopg 3) | `postgresql+psycopg://postgres:postgres@127.0.0.1:5432/rag` |
 | `PG_VECTOR_COLLECTION_NAME` | Nome da collection no pgVector | `documentos` |
 | `PDF_PATH` | Caminho do PDF a ser ingerido | `document.pdf` |
+| `INGEST_BATCH_SIZE` | *(opcional)* Chunks por lote na ingestão | `10` |
+| `INGEST_PAUSE_SECONDS` | *(opcional)* Pausa entre lotes, em segundos | `10` |
 
 > Os nomes de modelos mudam com frequência. Confira os modelos disponíveis na [documentação oficial do Gemini](https://ai.google.dev/gemini-api/docs/models).
 
@@ -106,10 +108,10 @@ python src/ingest.py
 Saída esperada:
 
 ```
-Ingestão concluída: 34 páginas, 67 chunks armazenados.
+Ingestão concluída: 34 páginas, 67 chunks no banco.
 ```
 
-A ingestão usa IDs determinísticos por chunk, então pode ser executada novamente sem duplicar os dados.
+A ingestão envia os chunks em lotes pequenos, com pausa entre eles e nova tentativa automática em caso de limite da API (429). Como usa IDs determinísticos, pode ser executada novamente: chunks já gravados são ignorados e ela retoma de onde parou.
 
 ### 7. Rodar o chat
 
